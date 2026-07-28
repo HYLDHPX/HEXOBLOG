@@ -4,42 +4,55 @@ export default {
     const url = new URL(request.url);
     let path = url.pathname;
 
+    // 目录自动补齐 index.html
     if (path.endsWith("/")) {
       path += "index.html";
     }
 
     const targetUrl = new URL(base + path);
     const res = await fetch(targetUrl, {
-      cf: { cacheTtl: 1800 }
+      cf: { cacheTtl: 1200 }
     });
 
+    // 404页面处理
     if (!res.ok) {
       const four04Res = await fetch(`${base}/404.html`);
       if (four04Res.ok) {
-        return new Response(four04Res.body, {
-          status: 404,
-          headers: fixHeaders(four04Res.headers, path)
-        });
+        return buildResponse(four04Res.body, path, 404);
       }
       return new Response("404 Not Found", { status: 404 });
     }
 
-    return new Response(res.body, {
-      headers: fixHeaders(res.headers, path)
-    });
+    return buildResponse(res.body, path, 200);
   }
 };
 
-function fixHeaders(originHeaders, path) {
-  const headers = new Headers(originHeaders);
+// 统一构建响应，强制修正Content-Type
+function buildResponse(body, path, status) {
+  const headers = new Headers();
+
+  // 强制设置正确MIME
+  if (path.endsWith(".html")) {
+    headers.set("content-type", "text/html; charset=utf-8");
+  } else if (path.endsWith(".css")) {
+    headers.set("content-type", "text/css; charset=utf-8");
+  } else if (path.endsWith(".js")) {
+    headers.set("content-type", "application/javascript; charset=utf-8");
+  } else if (path.endsWith(".xml")) {
+    headers.set("content-type", "application/xml; charset=utf-8");
+  } else if (path.endsWith(".json")) {
+    headers.set("content-type", "application/json; charset=utf-8");
+  } else if (path.endsWith(".png")) {
+    headers.set("content-type", "image/png");
+  } else if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
+    headers.set("content-type", "image/jpeg");
+  } else if (path.endsWith(".svg")) {
+    headers.set("content-type", "image/svg+xml");
+  }
+
+  headers.set("cache-control", "public, max-age=1200");
   headers.delete("x-frame-options");
   headers.delete("content-security-policy");
 
-  if (path.endsWith(".html")) headers.set("content-type", "text/html;charset=utf-8");
-  if (path.endsWith(".css")) headers.set("content-type", "text/css;charset=utf-8");
-  if (path.endsWith(".js")) headers.set("content-type", "application/javascript;charset=utf-8");
-  if (path.endsWith(".xml")) headers.set("content-type", "application/xml;charset=utf-8");
-  if (path.endsWith(".json")) headers.set("content-type", "application/json;charset=utf-8");
-
-  return headers;
+  return new Response(body, { status, headers });
 }
